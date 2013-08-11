@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+  <!-- 
+  http://citibikenyc.com/stations/json
+  -->
+  <head>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+    <script>
+      toRad = function(n) {
+        return n * Math.PI / 180;
+      }
+
+      $(function(){
+        var stations = null;
+        var longitude = null;
+        var latitude = null;
+
+        function getDistance(lat1, lon1, lat2, lon2) {
+          console.log(lat1, lon1, lat2, lon2);
+          var R = 6371; // km 
+          //has a problem with the .toRad() method below.
+          var x1 = lat2-lat1;
+          var dLat = toRad(x1);
+          var x2 = lon2-lon1;
+          var dLon = toRad(x2);
+          var a = Math.sin(dLat/2) * Math.sin(dLat/2) + 
+          Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * 
+          Math.sin(dLon/2) * Math.sin(dLon/2);  
+          var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+          var d = R * c; 
+          return d;
+        }
+        
+        function displayLocation() {
+          console.log(longitude, latitude, stations);
+          if (!longitude || !latitude || !stations) {
+            console.log('missing data.. continue waiting');
+            return;
+          }
+          var closestStation = null;
+          var distance = Number.MAX_VALUE;
+          for (var idx in stations) {
+            var station = stations[idx];
+            console.log(station);
+            var curDistance = getDistance(station['latitude'], station['longitude'], latitude, longitude);
+            console.log(curDistance, distance);
+            if (curDistance && curDistance < distance) {
+              closestStation = station;
+              distance = curDistance;
+            }
+          }
+          console.log(closestStation['stationName']);
+          var url = 'https://maps.google.com/maps?saddr=%lat1,%lon1&daddr=%lat2,%lon2';
+          url = url.replace(/%lat1/, latitude);
+          url = url.replace(/%lon1/, longitude);
+          url = url.replace(/%lat2/, closestStation['latitude']);
+          url = url.replace(/%lon2/, closestStation['longitude']);
+          $('#stationsList').append("<ul><a href='%url'>%name</a></ul>".replace(/%name/, closestStation['stationName']).replace(/%url/, url));
+        }
+        function storeLocation(position) {
+          latitude = position.coords.latitude;
+          longitude = position.coords.longitude;
+          displayLocation();
+        }
+
+        function getLocation() {
+          navigator.geolocation.getCurrentPosition(storeLocation);
+        }
+
+        function getBikeCounts() {
+          $.getJSON("http://query.yahooapis.com/v1/public/yql",
+          {
+            q:      "select * from json where url=\"http://citibikenyc.com/stations/json?" + "?fmt=JSON\"",
+            format: "json"
+          },
+          function(data){
+            if (data.query.results) {
+              stations = data.query.results.json['stationBeanList'];
+              displayLocation();
+              } else {
+              /* no info for this code */
+            }
+          }
+          );
+        }
+        getLocation();
+        getBikeCounts();
+      });
+    </script>
+  </head>
+  <body>
+    <div>
+      <h3>Stations</h3>
+      <li id='stationsList'>
+      </li>
+    </div>
+  </body>
+</html>
